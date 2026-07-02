@@ -37,6 +37,7 @@ public class ProductController {
     Product product = productService.getProductById(id);
     if(product == null){
         return ResponseEntity.notFound().build();
+        
     }
     return ResponseEntity.ok(product);
 }

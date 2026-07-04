@@ -11,8 +11,9 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import java.math.BigDecimal;
+import lombok.Setter;   
+import java.io.Serializable;
+
 
 @Getter
 @Setter
@@ -20,7 +21,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @Table(name = "product_table")
 @Entity
-public class Product {
+public class Product implements Serializable{
     @Id
     @GeneratedValue(strategy =  GenerationType.IDENTITY)
     private Long id;

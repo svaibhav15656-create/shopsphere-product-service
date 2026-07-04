@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 
 
@@ -64,4 +66,15 @@ public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
     }
     return ResponseEntity.notFound().build();
 }
+
+
+@GetMapping("/search/category/{category}")
+public ResponseEntity<List<Product>>  searchByCategory(@PathVariable String category) {
+    return ResponseEntity.ok(productService.searchByCategory(category));
+}
+@GetMapping("/search/name")
+public ResponseEntity<List<Product>> searchByName(@RequestParam String name) {
+    return ResponseEntity.ok(productService.searchByName(name));
+}
+
 }

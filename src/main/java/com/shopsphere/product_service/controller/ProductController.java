@@ -76,5 +76,10 @@ public ResponseEntity<List<Product>>  searchByCategory(@PathVariable String cate
 public ResponseEntity<List<Product>> searchByName(@RequestParam String name) {
     return ResponseEntity.ok(productService.searchByName(name));
 }
+@PutMapping("/{id}/reduce-stock")
+public ResponseEntity<Product> reduceStock(@PathVariable Long id, @RequestParam int quantity) {
+    Product product = productService.reduceStock(id, quantity);
+    return ResponseEntity.ok(product);
+}
 
 }

@@ -1,8 +1,11 @@
 package com.shopsphere.product_service.service;
 import java.util.*;
+
+
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -59,5 +62,17 @@ public class ProductService {
     public List<Product> searchByName(String name){
         return productRepository.findByNameContainingIgnoreCase(name);
     }
-
+    @Transactional
+    public Product reduceStock(Long id, int quantity){
+        Optional<Product> productOpt = productRepository.findById(id);
+        if(productOpt.isEmpty()){
+            throw new RuntimeException("Product not found");
+        }
+        Product product = productOpt.get();
+        if(product.getStockQuantity() < quantity){
+            throw new RuntimeException("Insufficient stock");
+        }
+        product.setStockQuantity(product.getStockQuantity() - quantity);
+        return productRepository.save(product);
+    }
 }

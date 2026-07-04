@@ -3,6 +3,9 @@ import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.shopsphere.product_service.entity.Product;
 import com.shopsphere.product_service.repository.ProductRepository;
 
@@ -24,8 +27,8 @@ public class ProductService {
        }
        return null;
     }
-    public  List<Product> getAllProducts(){
-        return productRepository.findAll();
+    public  Page<Product> getAllProducts(Pageable pageable){
+        return productRepository.findAll(pageable);
     }
     @CacheEvict(value = "products", key = "#id")
     public Product updateProduct(Long id, Product updatedProduct){

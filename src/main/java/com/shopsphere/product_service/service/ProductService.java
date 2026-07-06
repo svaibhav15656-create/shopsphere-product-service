@@ -75,4 +75,5 @@ public class ProductService {
         product.setStockQuantity(product.getStockQuantity() - quantity);
         return productRepository.save(product);
     }
+    
 }

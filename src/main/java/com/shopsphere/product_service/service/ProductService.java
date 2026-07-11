@@ -8,8 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.kafka.annotation.KafkaListener;
 
 import com.shopsphere.product_service.entity.Product;
+import com.shopsphere.product_service.event.OrderEvent;
 import com.shopsphere.product_service.repository.ProductRepository;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -63,6 +65,7 @@ public class ProductService {
         return productRepository.findByNameContainingIgnoreCase(name);
     }
     @Transactional
+    @CacheEvict(value = "products", key = "#id")
     public Product reduceStock(Long id, int quantity){
         Optional<Product> productOpt = productRepository.findById(id);
         if(productOpt.isEmpty()){
@@ -74,6 +77,10 @@ public class ProductService {
         }
         product.setStockQuantity(product.getStockQuantity() - quantity);
         return productRepository.save(product);
+    }
+    @KafkaListener(topics = "order-events",groupId = "product-service-group")
+    public void handleOrderCreated(OrderEvent event){
+        reduceStock(event.getProductId(), event.getQuantity());
     }
     
 }

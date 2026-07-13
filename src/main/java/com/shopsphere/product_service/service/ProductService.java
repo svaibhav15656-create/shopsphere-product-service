@@ -71,25 +71,28 @@ public class ProductService {
     @CacheEvict(value = "products", key = "#id")
     public Product reduceStock(Long id, int quantity){
         String lockKey = "lock:product:"+id;
+        //line below has true or false in lockAcuried if lock is there setIfAbsent will return fasle and if block will execute 
+        //otherwise setIFabsent willr eturn true if locked in not sent and setIfabsent and set it so lockacquied will ahve true value
+        //try block will excuted
         Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey,"LOCKED" ,Duration.ofSeconds(5));
         if(Boolean.FALSE.equals(lockAcquired)){
             throw new RuntimeException("Product is currently locked, try again");
         }
         try{
             Optional<Product> productOpt = productRepository.findById(id);
-        if(productOpt.isEmpty()){
-            throw new RuntimeException("Product not found");
-        }
-        Product product = productOpt.get();
-        if(product.getStockQuantity() < quantity){
-            throw new RuntimeException("Insufficient stock");
-        }
-        product.setStockQuantity(product.getStockQuantity() - quantity);
-        return productRepository.save(product);
-    }finally{
+            if(productOpt.isEmpty()){
+                throw new RuntimeException("Product not found");
+            }
+            Product product = productOpt.get();
+            if(product.getStockQuantity() < quantity){
+                throw new RuntimeException("Insufficient stock");
+            }
+            product.setStockQuantity(product.getStockQuantity() - quantity);
+            return productRepository.save(product);
+        }finally{
         redisTemplate.delete(lockKey);
     }
-        }
+}
     @KafkaListener(topics = "order-events",groupId = "product-service-group")
     public void handleOrderCreated(OrderEvent event){
         reduceStock(event.getProductId(), event.getQuantity());

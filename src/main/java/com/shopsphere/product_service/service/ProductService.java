@@ -1,7 +1,8 @@
 package com.shopsphere.product_service.service;
 import java.util.*;
 
-
+import org.springframework.data.redis.core.RedisTemplate;
+import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.cache.annotation.Cacheable;
 public class ProductService {
     @Autowired
     private ProductRepository productRepository;
+    @Autowired
+    private RedisTemplate<String,String> redisTemplate;
 
     public Product createProduct(Product product){
         return productRepository.save(product);
@@ -67,7 +70,13 @@ public class ProductService {
     @Transactional
     @CacheEvict(value = "products", key = "#id")
     public Product reduceStock(Long id, int quantity){
-        Optional<Product> productOpt = productRepository.findById(id);
+        String lockKey = "lock:product:"+id;
+        Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey,"LOCKED" ,Duration.ofSeconds(5));
+        if(Boolean.FALSE.equals(lockAcquired)){
+            throw new RuntimeException("Product is currently locked, try again");
+        }
+        try{
+            Optional<Product> productOpt = productRepository.findById(id);
         if(productOpt.isEmpty()){
             throw new RuntimeException("Product not found");
         }
@@ -77,7 +86,10 @@ public class ProductService {
         }
         product.setStockQuantity(product.getStockQuantity() - quantity);
         return productRepository.save(product);
+    }finally{
+        redisTemplate.delete(lockKey);
     }
+        }
     @KafkaListener(topics = "order-events",groupId = "product-service-group")
     public void handleOrderCreated(OrderEvent event){
         reduceStock(event.getProductId(), event.getQuantity());

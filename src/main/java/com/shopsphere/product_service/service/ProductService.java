@@ -10,10 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import com.shopsphere.product_service.entity.Product;
 import com.shopsphere.product_service.event.OrderEvent;
+import com.shopsphere.product_service.event.StockUpdateEvent;
 import com.shopsphere.product_service.repository.ProductRepository;
+
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,6 +26,8 @@ public class ProductService {
     private ProductRepository productRepository;
     @Autowired
     private RedisTemplate<String,String> redisTemplate;
+    @Autowired
+    KafkaTemplate<String,StockUpdateEvent> kafkaTemplate;
 
     public Product createProduct(Product product){
         return productRepository.save(product);
@@ -71,6 +76,7 @@ public class ProductService {
     @CacheEvict(value = "products", key = "#id")
     public Product reduceStock(Long id, int quantity){
         String lockKey = "lock:product:"+id;
+        //redis lock distribution
         //line below has true or false in lockAcuried if lock is there setIfAbsent will return fasle and if block will execute 
         //otherwise setIFabsent willr eturn true if locked in not sent and setIfabsent and set it so lockacquied will ahve true value
         //try block will excuted
@@ -95,7 +101,14 @@ public class ProductService {
 }
     @KafkaListener(topics = "order-events",groupId = "product-service-group")
     public void handleOrderCreated(OrderEvent event){
-        reduceStock(event.getProductId(), event.getQuantity());
+       try{
+            reduceStock(event.getProductId(), event.getQuantity());
+            kafkaTemplate.send("stock-update-events",
+            new StockUpdateEvent(event.getOrderId(),true,"stock updated successfully"));
+       }catch(RuntimeException ex){
+        kafkaTemplate.send("stock-update-events",
+            new StockUpdateEvent(event.getOrderId(),false, ex.getMessage()));
+       }
     }
     
 }

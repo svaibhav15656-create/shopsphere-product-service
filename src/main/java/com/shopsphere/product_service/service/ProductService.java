@@ -7,19 +7,22 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
-
+import com.shopsphere.product_service.entity.ProcessedOrder;
 import com.shopsphere.product_service.entity.Product;
 import com.shopsphere.product_service.event.OrderEvent;
 import com.shopsphere.product_service.event.StockUpdateEvent;
+import com.shopsphere.product_service.repository.ProcessedOrderRepository;
 import com.shopsphere.product_service.repository.ProductRepository;
-
+import org.springframework.dao.DataIntegrityViolationException;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+
 @Service
 public class ProductService {
     @Autowired
@@ -28,6 +31,8 @@ public class ProductService {
     private RedisTemplate<String,String> redisTemplate;
     @Autowired
     KafkaTemplate<String,StockUpdateEvent> kafkaTemplate;
+    @Autowired
+    private ProcessedOrderRepository processedOrderRepository;
 
     public Product createProduct(Product product){
         return productRepository.save(product);
@@ -99,16 +104,21 @@ public class ProductService {
         redisTemplate.delete(lockKey);
     }
 }
-    @KafkaListener(topics = "order-events",groupId = "product-service-group")
-    public void handleOrderCreated(OrderEvent event){
-       try{
-            reduceStock(event.getProductId(), event.getQuantity());
-            kafkaTemplate.send("stock-update-events",
-            new StockUpdateEvent(event.getOrderId(),true,"stock updated successfully"));
-       }catch(RuntimeException ex){
+  @Transactional
+@KafkaListener(topics = "order-events", groupId = "product-service-group")
+public void handleOrderCreated(OrderEvent event){
+    try {
+        processedOrderRepository.save(new ProcessedOrder(event.getOrderId()));
+        reduceStock(event.getProductId(), event.getQuantity());
         kafkaTemplate.send("stock-update-events",
-            new StockUpdateEvent(event.getOrderId(),false, ex.getMessage()));
-       }
+            new StockUpdateEvent(event.getOrderId(), true, "Stock reduced successfully"));
+    } catch (DataIntegrityViolationException dup) {
+        // genuine duplicate — save() never committed anything new, nothing to roll back
+    } catch (RuntimeException ex) {
+        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        kafkaTemplate.send("stock-update-events",
+            new StockUpdateEvent(event.getOrderId(), false, ex.getMessage()));
     }
+}
     
 }
